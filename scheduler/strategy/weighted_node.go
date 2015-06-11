@@ -40,9 +40,10 @@ func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node) (weightedNo
 		nodeCpus := node.TotalCpus
 
 		// Skip nodes that are smaller than the requested resources.
-		if nodeMemory < int64(config.Memory) || nodeCpus < config.CpuShares {
-			continue
-		}
+		// this is not needed anymore
+		//if nodeMemory < int64(config.Memory) || nodeCpus < config.CpuShares {
+		//	continue
+		//}
 
 		var (
 			cpuScore    int64 = 100

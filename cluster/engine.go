@@ -8,10 +8,13 @@ import (
 	"math"
 	"net"
 	"strings"
+	"strconv"
 	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/pkg/bitmap"
+	"github.com/docker/swarm/pkg/utils"
 	"github.com/samalba/dockerclient"
 )
 
@@ -46,6 +49,7 @@ type Engine struct {
 	Name   string
 	Cpus   int64
 	Memory int64
+	Cpuset bitmap.Bitmap
 	Labels map[string]string
 
 	stopCh          chan struct{}
@@ -150,6 +154,7 @@ func (e *Engine) updateSpecs() error {
 	e.Name = info.Name
 	e.Cpus = info.NCPU
 	e.Memory = info.MemTotal
+	e.Cpuset = bitmap.ZeroBitmap(uint64(info.NCPU))
 	e.Labels = map[string]string{
 		"storagedriver":   info.Driver,
 		"executiondriver": info.ExecutionDriver,
@@ -267,6 +272,14 @@ func (e *Engine) updateContainer(c dockerclient.Container, containers map[string
 		// FIXME remove "duplicate" lines and move this to cluster/config.go
 		container.Config.CpuShares = container.Config.CpuShares * e.Cpus / 1024.0
 		container.Config.HostConfig.CpuShares = container.Config.CpuShares
+
+        //Update Engine Cpuset! check if Lock is needed//
+        e.Lock()
+        for _, s := range utils.StringListSplit(container.Config.Cpuset) {
+        		p,_ := strconv.ParseUint(s, 10, 64)
+                bitmap.SetBit(&e.Cpuset, p)
+        }
+        e.Unlock()
 
 		// Save the entire inspect back into the container.
 		container.Info = *info
@@ -567,6 +580,12 @@ func (e *Engine) removeContainer(container *Container) error {
 	e.Lock()
 	defer e.Unlock()
 
+    //Update Engine Cpuset
+    for _, s := range utils.StringListSplit(container.Config.Cpuset) {
+    	  p,_ := strconv.ParseUint(s, 10, 64)
+          bitmap.UnsetBit(&e.Cpuset, p)
+    }
+    
 	if _, ok := e.containers[container.Id]; !ok {
 		return errors.New("container not found")
 	}

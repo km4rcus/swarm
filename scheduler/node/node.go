@@ -1,10 +1,12 @@
 package node
 
 import (
-	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/pkg/bitmap"
+	"github.com/docker/swarm/pkg/utils"
 )
 
 // Node is an abstract type used by the scheduler
@@ -21,6 +23,7 @@ type Node struct {
 	UsedCpus    int64
 	TotalMemory int64
 	TotalCpus   int64
+	Cpuset      bitmap.Bitmap
 
 	IsHealthy bool
 }
@@ -39,6 +42,7 @@ func NewNode(e *cluster.Engine) *Node {
 		UsedCpus:    e.UsedCpus(),
 		TotalMemory: e.TotalMemory(),
 		TotalCpus:   e.TotalCpus(),
+		Cpuset:      e.Cpuset,
 		IsHealthy:   e.IsHealthy(),
 	}
 }
@@ -70,13 +74,15 @@ func (n *Node) Container(IDOrName string) *cluster.Container {
 // AddContainer inject a container into the internal state.
 func (n *Node) AddContainer(container *cluster.Container) error {
 	if container.Config != nil {
-		memory := container.Config.Memory
-		cpus := container.Config.CpuShares
-		if n.TotalMemory-memory < 0 || n.TotalCpus-cpus < 0 {
-			return errors.New("not enough resources")
-		}
-		n.UsedMemory = n.UsedMemory + memory
-		n.UsedCpus = n.UsedCpus + cpus
+        // Update node resources: usedMemory, usedCpus and Cpuset
+        n.UsedMemory = n.UsedMemory + container.Config.Memory
+        n.UsedCpus = n.UsedCpus + container.Config.CpuShares
+        for _, s := range utils.StringListSplit(container.Config.Cpuset) {
+        		p,err := strconv.ParseUint(s, 10, 64)
+        	    if err == nil {
+        	    	bitmap.SetBit(&n.Cpuset, p)
+        	    }
+        }
 	}
 	n.Containers = append(n.Containers, container)
 	return nil

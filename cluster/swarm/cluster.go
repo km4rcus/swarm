@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/pkg/units"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/discovery"
+	"github.com/docker/swarm/pkg/bitmap"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/state"
@@ -531,6 +532,7 @@ func (c *Cluster) Info() [][]string {
 		info = append(info, []string{" └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
 		info = append(info, []string{" └ Reserved CPUs", fmt.Sprintf("%d / %d", engine.UsedCpus(), engine.TotalCpus())})
 		info = append(info, []string{" └ Reserved Memory", fmt.Sprintf("%s / %s", units.BytesSize(float64(engine.UsedMemory())), units.BytesSize(float64(engine.TotalMemory())))})
+		info = append(info, []string{" └ Reserved Cpuset", fmt.Sprintf("%s", bitmap.ToString(engine.Cpuset))})
 		labels := make([]string, 0, len(engine.Labels))
 		for k, v := range engine.Labels {
 			labels = append(labels, k+"="+v)
